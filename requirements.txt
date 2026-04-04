@@ -1,0 +1,14 @@
+streamlit
+os
+base64
+json
+tempfile
+cv2
+numpy
+jwt
+Levenshtein
+pandas
+fitz
+groq
+qreader
+dotenv
