@@ -12,6 +12,7 @@ import fitz
 from groq import Groq
 from qreader import QReader
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
 
@@ -182,7 +183,12 @@ def decode_qr(png_path: str) -> dict:
     Detect and decode QR code from image.
     Uses QReader (deep-learning based) — more robust than pyzbar on real invoices.
     """
-    qreader = QReader()
+    # Create writable temp directory
+    model_dir = Path(tempfile.gettempdir()) / "qreader_model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    # Force QReader to use this path
+    qreader = QReader(model_storage_path=str(model_dir))
     image = cv2.cvtColor(cv2.imread(png_path), cv2.COLOR_BGR2RGB)
     decoded_texts = qreader.detect_and_decode(image=image)
 
