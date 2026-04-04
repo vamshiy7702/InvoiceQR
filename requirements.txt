@@ -1,13 +1,10 @@
 streamlit
-base64
-json
-tempfile
-cv2
+opencv-python
 numpy
-jwt
 Levenshtein
 pandas
-fitz
 groq
 qreader
 dotenv
+PyJWT
+PyMuPDF

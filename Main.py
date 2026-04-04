@@ -8,7 +8,7 @@ import numpy as np
 import jwt
 import Levenshtein
 import pandas as pd
-import fitz  # pymupdf — no poppler needed
+import fitz  
 from groq import Groq
 from qreader import QReader
 from dotenv import load_dotenv
