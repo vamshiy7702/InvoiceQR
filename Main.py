@@ -3,16 +3,11 @@ import os
 import base64
 import json
 import tempfile
-import cv2
 import numpy as np
-import jwt
-import Levenshtein
 import pandas as pd
 import fitz  
 from groq import Groq
-from qreader import QReader
 from dotenv import load_dotenv
-from pathlib import Path
 
 load_dotenv()
 
@@ -166,40 +161,15 @@ div[data-testid="stFileUploader"]:hover { border-color: #d4522a; }
 def pdf_to_png(pdf_path: str, output_png: str, dpi: int = 200) -> str:
     """
     Render the first page of a PDF to PNG using PyMuPDF (fitz).
-    ✅ No Poppler required — pure Python, works on all platforms.
+    No Poppler required — pure Python, works on all platforms.
     """
     doc = fitz.open(pdf_path)
     page = doc[0]
-    # Scale matrix: PDF default is 72 dpi, multiply to get target dpi
     mat = fitz.Matrix(dpi / 72, dpi / 72)
     pix = page.get_pixmap(matrix=mat)
     pix.save(output_png)
     doc.close()
     return output_png
-
-
-def decode_qr(png_path: str) -> dict:
-    """
-    Detect and decode QR code from image.
-    Uses QReader (deep-learning based) — more robust than pyzbar on real invoices.
-    """
-    # Create writable temp directory
-    model_dir = Path(tempfile.gettempdir()) / "qreader_model"
-    model_dir.mkdir(parents=True, exist_ok=True)
-
-    # Force QReader to use this path
-    qreader = QReader(model_storage_path=str(model_dir))
-    image = cv2.cvtColor(cv2.imread(png_path), cv2.COLOR_BGR2RGB)
-    decoded_texts = qreader.detect_and_decode(image=image)
-
-    if not decoded_texts or decoded_texts[0] is None:
-        raise ValueError(
-            "No QR code detected in the invoice. "
-            "Ensure the PDF contains an embedded GST QR code."
-        )
-
-    payload = jwt.decode(decoded_texts[0], options={"verify_signature": False})
-    return eval(payload["data"])
 
 
 def extract_with_groq(png_path: str) -> dict:
@@ -299,26 +269,8 @@ Return only JSON.
     return json.loads(completion.choices[0].message.content)
 
 
-def cross_verify(res: dict, qr: dict) -> dict:
-    """
-    Use Levenshtein distance to auto-correct IRN and GSTINs
-    against the ground-truth values decoded from the QR code.
-    """
-    checks = {
-        "irn":          ("Irn",          4),
-        "hiib_gstin":   ("BuyerGstin",   2),
-        "dealer_gstin": ("SellerGstin",  2),
-    }
-    for field, (qr_key, threshold) in checks.items():
-        ocr_val = str(res.get(field) or "")
-        qr_val  = str(qr.get(qr_key, ""))
-        if qr_val and Levenshtein.distance(ocr_val, qr_val) <= threshold:
-            res[field] = qr_val
-    return res
-
-
 def generate_details(pdf_bytes: bytes, filename: str) -> dict:
-    """Full end-to-end pipeline: raw PDF bytes → verified extracted dict."""
+    """Full end-to-end pipeline: raw PDF bytes → extracted dict."""
     with tempfile.TemporaryDirectory() as tmp:
         pdf_path = os.path.join(tmp, filename)
         png_path = os.path.join(tmp, "page1.png")
@@ -326,10 +278,8 @@ def generate_details(pdf_bytes: bytes, filename: str) -> dict:
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
 
-        pdf_to_png(pdf_path, png_path)       # Step 1: PDF → image (PyMuPDF)
-        qr_data = decode_qr(png_path)        # Step 2: QR decode
-        result  = extract_with_groq(png_path) # Step 3: AI extraction
-        result  = cross_verify(result, qr_data) # Step 4: QR cross-verify
+        pdf_to_png(pdf_path, png_path)        # Step 1: PDF → image (PyMuPDF)
+        result = extract_with_groq(png_path)  # Step 2: AI extraction
 
     return result
 
@@ -390,7 +340,7 @@ def render_group(title: str, icon: str, fields: list, data: dict):
 st.markdown("""
 <div class="topbar">
     <div class="topbar-logo">Invoice<span>IQ</span></div>
-    <div class="topbar-tag">GST · QR-Verified · AI-Powered</div>
+    <div class="topbar-tag">GST · AI-Powered</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -401,7 +351,7 @@ with col_left:
     uploaded = st.file_uploader(
         "Upload Invoice PDF",
         type=["pdf"],
-        help="Upload a GST invoice PDF with an embedded QR code",
+        help="Upload a GST invoice PDF",
     )
 
     if uploaded:
@@ -425,8 +375,6 @@ with col_left:
             <span>Upload your invoice PDF</span></div>
         <div class="info-item"><span class="info-dot">→</span>
             <span>System scans and reads invoice content</span></div>
-        <div class="info-item"><span class="info-dot">→</span>
-            <span>QR code is verified for authenticity</span></div>
         <div class="info-item"><span class="info-dot">→</span>
             <span>Key details are extracted automatically</span></div>
         <div class="info-item"><span class="info-dot">→</span>
@@ -499,7 +447,3 @@ with col_right:
             <div class="empty-text">Upload a PDF and click Extract to begin</div>
         </div>
         """, unsafe_allow_html=True)
-
-
-
-
