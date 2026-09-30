@@ -252,7 +252,7 @@ Return only JSON.
 """
     client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
     completion = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        model="qwen/qwen3.8-27b",
         messages=[{
             "role": "user",
             "content": [
